@@ -3,22 +3,25 @@ package com.lsl.appclient;
 import com.alibaba.fastjson.JSON;
 import com.alibaba.fastjson.JSONArray;
 import com.alibaba.fastjson.JSONObject;
+import com.enumeration.Param;
 import com.lsl.bean.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.UnsupportedEncodingException;
+import java.util.Arrays;
 import java.util.Random;
 
 /**
  * @program: logproduce
  * @description: 生成日志
- * @author: lsl
- * @create: 2019-12-10 10:57
+ * @author: lh
+ * @create: 20210711
  **/
 public class AppMain {
 
     private final static Logger logger = LoggerFactory.getLogger(AppMain.class);
+
     private static Random rand = new Random();
 
     // 设备id
@@ -32,114 +35,66 @@ public class AppMain {
 
     public static void main(String[] args) {
 
-        // 参数一：控制发送每条的延时时间，默认是0
-        Long delay = args.length > 0 ? Long.parseLong(args[0]) : 0L;
+        long startTime = System.currentTimeMillis();
 
-        // 参数二：循环遍历次数
-        int loop_len = args.length > 1 ? Integer.parseInt(args[1]) : 500;
+        long param_size = args.length;
 
-        // 生成数据
-        generateLog(delay, loop_len);
+        Long delay;
+        int loop_len;
+        int send_type;
+
+        if (param_size == 3) {
+
+            // 参数一：控制发送每条的延时时间，默认是0
+            delay = args.length > 0 ? Long.parseLong(args[0]) : 0L;
+
+            // 参数二：循环遍历次数
+            loop_len = args.length > 1 ? Integer.parseInt(args[1]) : 500;
+
+            // 参数二：打印类型(type -> print:0 sdkLog:1)
+            send_type = args.length > 2 ? Integer.parseInt(args[2]) : 1;
+
+            // 生成数据
+            generateLog(delay, loop_len, send_type);
+
+        } else {
+
+            //发送使用提示
+            JSONArray alarm = new JSONArray();
+            alarm.addAll(Arrays.asList(Param.delay_default_0, Param.loop_len_default_500, Param.send_type_default_log));
+            JSONObject alarm_json = new JSONObject();
+            alarm_json.put("Please Recheck Param", alarm);
+            String alarm_str = alarm_json.toString();
+            logger.info(alarm_str);
+        }
+
+        long endTime = System.currentTimeMillis();
+
+        logger.info(" TotalCost >>>>>>>>>>> " + (endTime - startTime)/1000 + " (s)");
     }
 
-    private static void generateLog(Long delay, int loop_len) {
+    private static void generateLog(Long delay, int loop_len, int send_type) {
 
+        int sendLogCount = 0;
+
+        //考虑增加并发
         for (int i = 0; i < loop_len; i++) {
 
             int flag = rand.nextInt(2);
 
-            switch (flag) {
-                case (0):
-                    //应用启动
-                    AppStart appStart = generateStart();
-                    String jsonString = JSON.toJSONString(appStart);
+            String messag_str = generateLogDetail(flag);
 
-                    //控制台打印
-                    logger.info(jsonString);
-                    break;
+            // moke的日志类型
+            if (send_type == 1) {
 
-                case (1):
+                //发送后台接口
+                 sendLogCount = sendMessages(messag_str);
 
-                    JSONObject json = new JSONObject();
+            } else {
 
-                    json.put("ap", "app");
-                    json.put("cm", generateComFields());
-
-                    JSONArray eventsArray = new JSONArray();
-
-                    // 事件日志
-                    // 商品点击，展示
-                    if (rand.nextBoolean()) {
-                        eventsArray.add(generateDisplay());
-                        json.put("et", eventsArray);
-                    }
-
-                    // 商品详情页
-                    if (rand.nextBoolean()) {
-                        eventsArray.add(generateNewsDetail());
-                        json.put("et", eventsArray);
-                    }
-
-                    // 商品列表页
-                    if (rand.nextBoolean()) {
-                        eventsArray.add(generateNewList());
-                        json.put("et", eventsArray);
-                    }
-
-                    // 广告
-                    if (rand.nextBoolean()) {
-                        eventsArray.add(generateAd());
-                        json.put("et", eventsArray);
-                    }
-
-                    // 消息通知
-                    if (rand.nextBoolean()) {
-                        eventsArray.add(generateNotification());
-                        json.put("et", eventsArray);
-                    }
-
-                    // 用户前台活跃
-                    if (rand.nextBoolean()) {
-                        eventsArray.add(generatbeforeground());
-                        json.put("et", eventsArray);
-                    }
-
-                    // 用户后台活跃
-                    if (rand.nextBoolean()) {
-                        eventsArray.add(generateBackground());
-                        json.put("et", eventsArray);
-                    }
-
-                    //故障日志
-                    if (rand.nextBoolean()) {
-                        eventsArray.add(generateError());
-                        json.put("et", eventsArray);
-                    }
-
-                    // 用户评论
-                    if (rand.nextBoolean()) {
-                        eventsArray.add(generateComment());
-                        json.put("et", eventsArray);
-                    }
-
-                    // 用户收藏
-                    if (rand.nextBoolean()) {
-                        eventsArray.add(generateFavorites());
-                        json.put("et", eventsArray);
-                    }
-
-                    // 用户点赞
-                    if (rand.nextBoolean()) {
-                        eventsArray.add(generatePraise());
-                        json.put("et", eventsArray);
-                    }
-
-                    //时间
-                    long millis = System.currentTimeMillis();
-
-                    //控制台打印
-                    logger.info(millis + "|" + json.toJSONString());
-                    break;
+                //打印样列
+                logger.info(" moke data >>>>>>>>> " + messag_str);
+                sendLogCount++;
             }
 
             // 延迟
@@ -149,6 +104,110 @@ public class AppMain {
                 e.printStackTrace();
             }
         }
+
+        logger.info(" TotalRows >>>>>>>>>>> " + (sendLogCount) + " (Rows)");
+    }
+
+    //todo 调用虚拟后台接口
+    private static int sendMessages(String message) {
+        return 0;
+    }
+
+    //todo 策略模式 动态生成日志格式
+    private static String generateLogDetail(int flag) {
+
+        String message = "";
+
+        switch (flag) {
+
+            case (0):
+                //应用启动
+                AppStart appStart = generateStart();
+                message = JSON.toJSONString(appStart);
+
+                break;
+
+            case (1):
+
+                JSONObject json = new JSONObject();
+
+                json.put("ap", "app");
+                json.put("cm", generateComFields());
+
+                JSONArray eventsArray = new JSONArray();
+
+                // 事件日志
+                // 商品点击，展示
+                if (rand.nextBoolean()) {
+                    eventsArray.add(generateDisplay());
+                    json.put("et", eventsArray);
+                }
+
+                // 商品详情页
+                if (rand.nextBoolean()) {
+                    eventsArray.add(generateNewsDetail());
+                    json.put("et", eventsArray);
+                }
+
+                // 商品列表页
+                if (rand.nextBoolean()) {
+                    eventsArray.add(generateNewList());
+                    json.put("et", eventsArray);
+                }
+
+                // 广告
+                if (rand.nextBoolean()) {
+                    eventsArray.add(generateAd());
+                    json.put("et", eventsArray);
+                }
+
+                // 消息通知
+                if (rand.nextBoolean()) {
+                    eventsArray.add(generateNotification());
+                    json.put("et", eventsArray);
+                }
+
+                // 用户前台活跃
+                if (rand.nextBoolean()) {
+                    eventsArray.add(generatbeforeground());
+                    json.put("et", eventsArray);
+                }
+
+                // 用户后台活跃
+                if (rand.nextBoolean()) {
+                    eventsArray.add(generateBackground());
+                    json.put("et", eventsArray);
+                }
+
+                //故障日志
+                if (rand.nextBoolean()) {
+                    eventsArray.add(generateError());
+                    json.put("et", eventsArray);
+                }
+
+                // 用户评论
+                if (rand.nextBoolean()) {
+                    eventsArray.add(generateComment());
+                    json.put("et", eventsArray);
+                }
+
+                // 用户收藏
+                if (rand.nextBoolean()) {
+                    eventsArray.add(generateFavorites());
+                    json.put("et", eventsArray);
+                }
+
+                // 用户点赞
+                if (rand.nextBoolean()) {
+                    eventsArray.add(generatePraise());
+                    json.put("et", eventsArray);
+                }
+
+                message = json.toJSONString();
+
+        }
+
+        return message;
     }
 
     /**
@@ -650,6 +709,7 @@ public class AppMain {
 
         return appStart;
     }
+
     /**
      * 消息通知
      */
