@@ -77,7 +77,7 @@ public class AppMain {
 
         int sendLogCount = 0;
 
-        //考虑增加并发
+        //todo 考虑增加并发
         for (int i = 0; i < loop_len; i++) {
 
             int flag = rand.nextInt(2);
